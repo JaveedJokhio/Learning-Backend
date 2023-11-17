@@ -1,5 +1,5 @@
 body{
-    background-color: teal;
+    background-color: rgb(128, 83, 0);
 }
 form{
     text-align: center;
@@ -17,4 +17,5 @@ button{
     color: beige;
     padding: 5px;
     cursor: pointer;
+    width: 8rem;
 }

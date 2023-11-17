@@ -1,14 +1,12 @@
 import mongoose from 'mongoose';
 import express from 'express';
 import path from 'path';
-import axios from 'axios';
 import bodyParser from 'body-parser';
-import vm from 'vm'
-import { execSync } from 'child_process';
-import { writeFileSync, unlinkSync } from 'fs';
+import cookieParser from 'cookie-parser';
+import jwt from 'jsonwebtoken';
 
 const app = express();
-const port = 4000;
+const port = process.env.PORT || 4000;
 
 // MongoDB configuration
 const mongoDB = "mongodb://0.0.0.0:27017/";
@@ -19,99 +17,92 @@ mongoose.connect(mongoDB, {
   .catch((e) => console.log(e));
 
 // Schema and model setup
-const msgSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
   name: String,
   email: String,
+  password:String,
 });
-const msg = mongoose.model("Message", msgSchema);
+const User = mongoose.model("User", userSchema);
 
 // Middlewares and settings
 app.use(express.static(path.join(path.resolve(), "public")));
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
+app.use(cookieParser());
 app.set("view engine", "ejs");
 
-// Compile endpoint
-app.post('/execute', (req, res) => {
-  try {
-    const code = req.body.code;
-    const language = req.body.language;
-
-    let result;
-
-    if (language === 'javascript') {
-      result = executeJavaScriptCode(code);
-    } else if (language === 'cpp') {
-      result = executeCppCode(code);
-    } else {
-      throw new Error('Unsupported language');
-    }
-
-    res.json({ success: true, result });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+// autheticate handler
+const isAuthenticated = async (req, res, next) => {
+  const { token } = req.cookies;
+  if (token) {
+    const decoded = jwt.verify(token,"All is well")
+     req.user = await User.findById(decoded._id)
+    next()
+  } else {
+    res.redirect("/login");
   }
-});
-
-function executeJavaScriptCode(code) {
-  try {
-    const context = { console };
-    const result = runInNewContext(code, context);
-
-    return result;
-  } catch (error) {
-    return `Error: ${error.message}`;
-  }
-}
-
-function executeCppCode(code) {
-  try {
-    // Write the C++ code to a temporary file
-    const fileName = 'temp.cpp';
-    writeFileSync(fileName, code, 'utf-8');
-
-    // Compile the C++ code using g++
-    const compileCommand = `g++ -o temp ${fileName}`;
-    execSync(compileCommand);
-
-    // Run the compiled executable
-    const executeCommand = './temp';
-    const result = execSync(executeCommand, { encoding: 'utf-8' });
-
-    // Clean up the temporary files
-    unlinkSync(fileName);
-    unlinkSync('temp');
-
-    return result.trim();
-  } catch (error) {
-    return `Error: ${error.message}`;
-  }
-}
-
-
+};
 
 // Other routes
-app.get("/", (req, res) => {
-  res.render("index");
+app.get("/", isAuthenticated, (req, res) => {
+res.render("logout",{name:req.user.name})
 });
-
-app.get("/add", async (req, res) => {
-  await msg.create({ name: "Javi2", email: "javi2@gmail.com" })
-  res.send("nice");
-});
-
-app.post("/contact", async (req, res) => {
-  const msgData = { name: req.body.name, email: req.body.email };
-  await msg.create(msgData);
-  res.send("success");
-});
-
-app.get("/users", (req, res) => {
-  res.json({
-    users,
+app.get("/register", (req, res) => {
+  res.render("register")
   });
-  res.send("success");
-});
+app.get("/login", (req, res) => {
+  res.render("login")
+  });
+
+app.post("/login",async(req,res)=>{
+ const {email,password} = req.body;
+
+  let user = await User.findOne({email});
+  if(!user) return res.redirect("/register");
+
+  const isMatched = user.password === password;
+  if(!isMatched) res.render("/login",{message:"Incorrect password"});
+
+  const token = jwt.sign({_id:user._id},"All is well")
+ 
+
+  res.cookie("token", token, {
+    httpOnly: true, expires: new Date(Date.now() + 10 * 1000)
+  });
+
+  res.redirect('/') 
+
+    
+})
+app.post('/register',async (req, res) => {
+ const {name,email,password} = req.body
+
+  let user = await User.findOne({email})
+
+  if(user){
+    return res.redirect("/login")
+    
+  }
+
+   user = await User.create({
+    name,email,password
+  })
+  const token = jwt.sign({_id:user._id},"All is well")
+ 
+
+  res.cookie("token", token, {
+    httpOnly: true, expires: new Date(Date.now() + 10 * 1000)
+  });
+
+  res.redirect('/')
+})
+app.get('/logout', (req, res) => {
+  res.cookie("token", null, {
+    httpOnly: true, expires: new Date(Date.now())
+  });
+
+  res.redirect('/')
+})
 
 // Start the server
 app.listen(port, () => {
