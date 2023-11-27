@@ -6,12 +6,15 @@
     <link rel="stylesheet" href="styles.css">
 
 </head>
-<body>
+<body>  
     <form method="post" action="/login">
         <h3>Log In Now</h3>
         <input type="text" name="email" placeholder="email"/>
         <input type="password" name="password" placeholder="password"/>
-        <P class="ERROR"><%= message %></P>
+      
+        <p>
+            <%= message %>
+        </p>
         <button>Log In</button>
     </form>
     

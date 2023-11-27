@@ -16,14 +16,15 @@ mongoose.connect(mongoDB, {
   .then(() => console.log("DB Connected"))
   .catch((e) => console.log(e));
 
+
 // Schema and model setup
 const userSchema = new mongoose.Schema({
   name: String,
   email: String,
   password:String,
-});
+}); 
 const User = mongoose.model("User", userSchema);
-
+  
 // Middlewares and settings
 app.use(express.static(path.join(path.resolve(), "public")));
 app.use(express.urlencoded({ extended: true }));
@@ -51,26 +52,29 @@ app.get("/register", (req, res) => {
   res.render("register")
   });
 app.get("/login", (req, res) => {
-  res.render("login")
-  });
+  res.render("login", { message: "" }); 
+  });    
 
 app.post("/login",async(req,res)=>{
  const {email,password} = req.body;
 
   let user = await User.findOne({email});
   if(!user) return res.redirect("/register");
-
-  const isMatched = user.password === password;
-  if(!isMatched) res.render("/login",{message:"Incorrect password"});
-
-  const token = jwt.sign({_id:user._id},"All is well")
  
-
+  const isMatched = user.password === password;
+  if (!isMatched) {
+    res.render("login", { message: "Incorrect password" });
+    return; // Add this line to exit the function
+  } 
+  
+  const token = jwt.sign({ _id: user._id }, "All is well");
+  
   res.cookie("token", token, {
-    httpOnly: true, expires: new Date(Date.now() + 10 * 1000)
+    httpOnly: true, expires: new Date(Date.now() + 10 * 1000),
   });
-
-  res.redirect('/') 
+  
+  res.redirect('/');
+  
 
     
 })
